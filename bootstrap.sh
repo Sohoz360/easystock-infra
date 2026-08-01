@@ -32,10 +32,16 @@ id "${DEPLOY_USER}" &>/dev/null || adduser --disabled-password --gecos "" "${DEP
 usermod -aG sudo "${DEPLOY_USER}"
 echo "${DEPLOY_USER} ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/90-${DEPLOY_USER}"
 chmod 440 "/etc/sudoers.d/90-${DEPLOY_USER}"
-if [ -f /root/.ssh/authorized_keys ]; then
+# Key source: root's authorized_keys, else the sudo caller's (OVH images have no
+# root key — you log in as 'ubuntu' and run this via sudo).
+KEY_SRC=/root/.ssh/authorized_keys
+[ -f "${KEY_SRC}" ] || KEY_SRC="/home/${SUDO_USER:-nobody}/.ssh/authorized_keys"
+if [ -f "${KEY_SRC}" ]; then
   install -d -m 700 -o "${DEPLOY_USER}" -g "${DEPLOY_USER}" "/home/${DEPLOY_USER}/.ssh"
   install -m 600 -o "${DEPLOY_USER}" -g "${DEPLOY_USER}" \
-    /root/.ssh/authorized_keys "/home/${DEPLOY_USER}/.ssh/authorized_keys"
+    "${KEY_SRC}" "/home/${DEPLOY_USER}/.ssh/authorized_keys"
+else
+  echo "WARNING: no authorized_keys found for root or ${SUDO_USER:-<sudo user>} — '${DEPLOY_USER}' will NOT be reachable over SSH." >&2
 fi
 
 log "2/7  Firewall (ufw): SSH + web only"
