@@ -4,6 +4,10 @@
 .env
 .env.*
 
+# Dozzle's user database (bcrypt password hashes) + session keys. Server-only,
+# same rule as .env — generate it on the box, never commit it.
+dozzle/data/
+
 # OS / editor cruft
 .DS_Store
 *.swp

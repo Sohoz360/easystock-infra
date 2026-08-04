@@ -7,14 +7,28 @@
 #     cannot start/stop/exec anything. (Portainer needed RW = root on the host.)
 #   • NO published host port → never on the public IP; only Caddy (on the shared
 #     `edge` network) can reach it at dozzle:8080.
-#   • Caddy locks the public hostname behind Basic Auth over HTTPS
-#     (see infra/Caddyfile → dozzle.ezycore.com block). That is the only gate —
-#     Dozzle has no login of its own in this setup, so use a STRONG password.
+#   • Caddy terminates HTTPS and proxies straight through — NO Basic Auth layer.
+#     Dozzle's own `simple` auth provider is the ONLY gate, so the account in
+#     data/users.yml must have a strong password. See "First-time setup" below.
 #
 # ⚠️ Do NOT set DOZZLE_ENABLE_ACTIONS=true. The restart/stop buttons it unlocks
 #    need a read-write socket, which throws away the reason we moved off Portainer.
 #    Container lifecycle stays on the CLI over SSH (`docker compose up -d`), which
 #    is also what CI does — a UI that fights `docker compose` causes drift.
+#
+# FIRST-TIME SETUP (and to add/rotate a user) — run ON THE SERVER, never commit
+# the result: data/users.yml holds bcrypt password hashes and is gitignored.
+#
+#   mkdir -p /opt/easystock/dozzle/data
+#   docker run --rm amir20/dozzle:v10.6.14 generate \
+#       --name "Admin" --email admin@ezycore.com --password '<STRONG-PASSWORD>' admin \
+#       > /opt/easystock/dozzle/data/users.yml
+#   docker compose up -d --force-recreate dozzle
+#
+# The trailing `admin` is the LOGIN USERNAME; --name is just the display name.
+# `generate` prints to stdout, so the `>` redirect is what creates the file.
+# Without data/users.yml, Dozzle starts with NO usable account and every login
+# fails with "Username or password are not valid".
 #
 # Deploy:  cd /opt/easystock/dozzle && docker compose up -d
 services:
@@ -25,12 +39,19 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
-      # Auth is Caddy's job (see above), so Dozzle's own provider stays off.
-      DOZZLE_AUTH_PROVIDER: none
+      # Dozzle owns its own login (bcrypt + session cookie). There is no second
+      # gate in front of it — see the security model above.
+      DOZZLE_AUTH_PROVIDER: simple
+      # Session lifetime; re-login after this.
+      DOZZLE_AUTH_TTL: 720h
       # Keep the last N lines per container in the UI's initial fetch.
       DOZZLE_TAILSIZE: "300"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mount the DIRECTORY, not data/users.yml directly: a single-file bind mount
+      # pins an inode, so rewriting the file (generate >, git, most editors) leaves
+      # the container reading the old deleted one. This bit us on infra/Caddyfile.
+      - ./data:/data
     networks: [edge]
     # NOTE: intentionally NO `ports:` — reachable only via the edge network (Caddy).
 
