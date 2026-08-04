@@ -15,6 +15,7 @@ infra/        # shared Caddy reverse proxy (HTTPS front door) — §9
 └── docker-compose.yml
 staging/      # staging app stack            — §10 (compose only; .env.* live on server)
 production/   # production app stack         — §10 (compose only; .env.* live on server)
+dozzle/       # live container log viewer (read-only Docker socket, Caddy Basic Auth)
 templates/    # the ecosystem's ENV REGISTRY — copy to the server and fill the blanks
 bootstrap.sh  # provision a blank Ubuntu 24.04 VPS (idempotent, provider-agnostic)
 ```

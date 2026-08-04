@@ -37,16 +37,19 @@ mc-api.ezycore.com {
     reverse_proxy mc-api-prod:6000
 }
 
-# Portainer — admin-only ops UI. NOT public: Basic Auth over HTTPS (no IP allowlist,
-# since admin has no fixed IP). Auth is the only gate — use a STRONG password.
+# Dozzle — admin-only live log viewer (replaced Portainer 2026-08-04). NOT public:
+# Basic Auth over HTTPS (no IP allowlist, since admin has no fixed IP). Dozzle runs
+# with DOZZLE_AUTH_PROVIDER=none, so this is the ONLY gate — use a STRONG password.
 # Generate the hash with:
 #   docker run --rm caddy caddy hash-password --plaintext 'your-strong-pass'
 # (Caddy < 2.8 uses `basicauth` instead of `basic_auth`.)
-portainer.ezycore.com {
+#
+# Logs stream over SSE — do not add flush_interval/timeout directives here.
+dozzle.ezycore.com {
     basic_auth {
         admin $2a$14$goPzdzRpa8.sm5HMD4jKnu9.pwIiyTZpQz.tt1E6jMYJXdv8aN15q       # ← output of caddy hash-password
     }
-    reverse_proxy portainer:9000
+    reverse_proxy dozzle:8080
 }
 
 # Every workspace subdomain (acme.ezycore.com, …) → the customer frontend.

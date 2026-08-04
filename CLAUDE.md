@@ -11,7 +11,7 @@ the deploy flow is: edit locally → git push → (on server) git pull → `dock
 infra/         # shared Caddy reverse proxy (HTTPS front door), Caddyfile + compose
 staging/       # staging app stack   (compose only; .env.* live on the server)
 production/    # production app stack (compose only; .env.* live on the server)
-portainer/     # container UI
+dozzle/        # live container log viewer (read-only socket; replaced Portainer)
 templates/     # ⭐ the env registry — see below
 bootstrap.sh   # provision a blank Ubuntu 24.04 VPS (idempotent)
 ```

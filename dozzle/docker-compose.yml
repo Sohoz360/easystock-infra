@@ -1,0 +1,47 @@
+# Dozzle — admin-only live log viewer for every container on this host.
+# Replaced Portainer (2026-08-04): logs/triage were the only thing it was ever
+# used for, and Dozzle does that with a READ-ONLY socket.
+#
+# Security model:
+#   • Socket is mounted `:ro` — Dozzle can read logs and container metadata, and
+#     cannot start/stop/exec anything. (Portainer needed RW = root on the host.)
+#   • NO published host port → never on the public IP; only Caddy (on the shared
+#     `edge` network) can reach it at dozzle:8080.
+#   • Caddy locks the public hostname behind Basic Auth over HTTPS
+#     (see infra/Caddyfile → dozzle.ezycore.com block). That is the only gate —
+#     Dozzle has no login of its own in this setup, so use a STRONG password.
+#
+# ⚠️ Do NOT set DOZZLE_ENABLE_ACTIONS=true. The restart/stop buttons it unlocks
+#    need a read-write socket, which throws away the reason we moved off Portainer.
+#    Container lifecycle stays on the CLI over SSH (`docker compose up -d`), which
+#    is also what CI does — a UI that fights `docker compose` causes drift.
+#
+# Deploy:  cd /opt/easystock/dozzle && docker compose up -d
+services:
+  dozzle:
+    image: amir20/dozzle:v10.6.14           # bump deliberately; `docker compose pull` after editing
+    container_name: dozzle
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      # Auth is Caddy's job (see above), so Dozzle's own provider stays off.
+      DOZZLE_AUTH_PROVIDER: none
+      # Keep the last N lines per container in the UI's initial fetch.
+      DOZZLE_TAILSIZE: "300"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [edge]
+    # NOTE: intentionally NO `ports:` — reachable only via the edge network (Caddy).
+
+networks:
+  edge:
+    external: true     # shared with Caddy + the app stacks
+
+# Dozzle streams logs over SSE, so the Caddy block in front of it must not buffer
+# or impose a response timeout. Caddy's default `reverse_proxy` streams correctly —
+# do not add `flush_interval`/timeout directives there without testing the stream.
+#
+# OPTIONAL HARDENING (defense in depth): front the socket with
+# tecnativa/docker-socket-proxy (CONTAINERS=1, POST=0) so even the read-only mount
+# is narrowed to the endpoints Dozzle needs. See SECRETS-AND-RECOVERY.md.
